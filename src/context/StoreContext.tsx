@@ -15,6 +15,24 @@ export function formatINR(amount: number): string {
   return `₹${Math.round(amount).toLocaleString('en-IN')}`;
 }
 
+const BASE_PREFIX = (() => {
+  const base = import.meta.env.BASE_URL || '/';
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+})();
+
+function stripBasePrefix(pathnameWithSearch: string): string {
+  if (BASE_PREFIX && pathnameWithSearch.startsWith(BASE_PREFIX)) {
+    const stripped = pathnameWithSearch.slice(BASE_PREFIX.length);
+    return stripped.startsWith('/') ? stripped : `/${stripped}`;
+  }
+  return pathnameWithSearch || '/';
+}
+
+function withBasePrefix(appRoute: string): string {
+  if (!BASE_PREFIX) return appRoute;
+  return appRoute.startsWith('/') ? `${BASE_PREFIX}${appRoute}` : `${BASE_PREFIX}/${appRoute}`;
+}
+
 interface ToastItem {
   id: number;
   message: string;
@@ -24,6 +42,7 @@ interface ToastItem {
 interface StoreContextValue {
   route: string;
   navigate: (to: string) => void;
+  backendUnavailable: boolean;
   config: StoreConfig | null;
   paymentMode: 'live' | 'sandbox';
   razorpayKeyId: string;
@@ -70,7 +89,8 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | null>(null);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [route, setRoute] = useState<string>(() => window.location.pathname + window.location.search);
+  const [route, setRoute] = useState<string>(() => stripBasePrefix(window.location.pathname + window.location.search));
+  const [backendUnavailable, setBackendUnavailable] = useState(false);
   const [config, setConfig] = useState<StoreConfig | null>(null);
   const [paymentMode, setPaymentMode] = useState<'live' | 'sandbox'>('sandbox');
   const [razorpayKeyId, setRazorpayKeyId] = useState<string>('');
@@ -125,15 +145,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const navigate = useCallback((to: string) => {
-    if (to !== window.location.pathname + window.location.search) {
-      window.history.pushState({}, '', to);
+    const normalized = to.startsWith('/') ? to : `/${to}`;
+    const targetUrl = withBasePrefix(normalized);
+    if (targetUrl !== window.location.pathname + window.location.search) {
+      window.history.pushState({}, '', targetUrl);
     }
-    setRoute(to);
+    setRoute(normalized);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {
-    const onPop = () => setRoute(window.location.pathname + window.location.search);
+    const onPop = () => setRoute(stripBasePrefix(window.location.pathname + window.location.search));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -147,6 +169,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setPublicCoupons(cfgJson.coupons || []);
         setPaymentMode(cfgJson.payment?.mode || 'sandbox');
         setRazorpayKeyId(cfgJson.payment?.razorpayKeyId || '');
+        setBackendUnavailable(false);
+      } else {
+        setBackendUnavailable(true);
       }
       if (catRes.ok) {
         const catJson = await catRes.json();
@@ -154,6 +179,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('Store meta load error:', err);
+      setBackendUnavailable(true);
     }
   }, []);
 
@@ -516,6 +542,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       value={{
         route,
         navigate,
+        backendUnavailable,
         config,
         paymentMode,
         razorpayKeyId,

@@ -13,8 +13,44 @@ import { ProductDetailPage } from './pages/ProductDetailPage';
 import { ShopPage } from './pages/ShopPage';
 import { FaqPage, PolicyPage, SupportPage } from './pages/SupportPages';
 
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error?.message || 'Unexpected rendering error.' };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6 text-center">
+          <div className="max-w-md bg-white border border-slate-200 rounded-2xl p-8 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#EA580C]">AAGAMAN MART</p>
+            <h1 className="font-display text-xl font-bold text-[#0B1F3A]">Something went wrong</h1>
+            <p className="text-xs text-slate-600">{this.state.message}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-lg bg-[#0B1F3A] text-white text-xs font-semibold"
+            >
+              Reload Store
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const AppRouter: React.FC = () => {
-  const { route } = useStore();
+  const { route, backendUnavailable } = useStore();
   const path = route.split('?')[0];
 
   if (path.startsWith('/admin')) {
@@ -43,6 +79,12 @@ const AppRouter: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900">
       <Navbar />
+      {backendUnavailable && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs text-center">
+          Static preview detected: Backend API (<code className="font-mono">/api/*</code>) and PostgreSQL database are
+          not active on static hosts like GitHub Pages. Deploy with Node.js (<code className="font-mono">npm run build && npm start</code>) for full catalog, auth, checkout, and admin features.
+        </div>
+      )}
       <div className="flex-1">{page}</div>
       <Footer />
       <CartDrawer />
@@ -54,8 +96,10 @@ const AppRouter: React.FC = () => {
 
 export default function App() {
   return (
-    <StoreProvider>
-      <AppRouter />
-    </StoreProvider>
+    <AppErrorBoundary>
+      <StoreProvider>
+        <AppRouter />
+      </StoreProvider>
+    </AppErrorBoundary>
   );
 }
