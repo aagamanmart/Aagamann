@@ -6,11 +6,13 @@
     <link rel="icon" href="%BASE_URL%favicon.ico" />
     <script>
       (function () {
-        var redirect = sessionStorage.getItem('aagaman_spa_redirect');
-        if (redirect) {
-          sessionStorage.removeItem('aagaman_spa_redirect');
-          window.history.replaceState(null, '', redirect);
-        }
+        try {
+          var redirect = sessionStorage.getItem('aagaman_spa_redirect');
+          if (redirect) {
+            sessionStorage.removeItem('aagaman_spa_redirect');
+            window.history.replaceState(null, '', redirect);
+          }
+        } catch (e) {}
       })();
     </script>
     <title>AAGAMAN MART – Quality That Moves You Forward | Online Shopping India</title>
