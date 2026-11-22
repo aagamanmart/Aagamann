@@ -25,20 +25,38 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f bun.lock ] || [ -f bun.lockb ]; then
+            bun install --frozen-lockfile || bun install
+          else
+            npm install --no-audit --no-fund
+          fi
 
       - name: Build static frontend with GitHub Pages base path
         run: |
           REPO_NAME="${GITHUB_REPOSITORY#*/}"
           OWNER_NAME="${GITHUB_REPOSITORY%%/*}"
-          if [ "$REPO_NAME" = "${OWNER_NAME}.github.io" ]; then
+          RAW_BASE="${{ steps.pages.outputs.base_path }}"
+          if [ -n "$RAW_BASE" ]; then
+            BASE_PATH="${RAW_BASE}/"
+          elif [ "$REPO_NAME" = "${OWNER_NAME}.github.io" ]; then
             BASE_PATH="/"
           else
             BASE_PATH="/${REPO_NAME}/"
           fi
+          BASE_PATH="$(printf '%s' "$BASE_PATH" | sed 's://*:/:g')"
+          echo "Building with BASE_PATH=$BASE_PATH"
           npx vite build --base="$BASE_PATH"
 
       - name: Upload artifact
